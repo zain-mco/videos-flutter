@@ -3,12 +3,32 @@ import { ref, computed } from 'vue'
 
 export const useVideoStore = defineStore('videos', () => {
     const videos = ref([])
+    const isLoaded = ref(false)
 
-    // Load videos from localStorage on init
-    const loadVideos = () => {
+    // Load videos from localStorage or JSON file
+    const loadVideos = async () => {
         const saved = localStorage.getItem('showcase-videos')
-        if (saved) {
+
+        if (saved && JSON.parse(saved).length > 0) {
             videos.value = JSON.parse(saved)
+            isLoaded.value = true
+        } else {
+            // Try to load from public/videos-config.json
+            try {
+                const response = await fetch('/videos-config.json')
+                if (response.ok) {
+                    const data = await response.json()
+                    if (Array.isArray(data) && data.length > 0) {
+                        videos.value = data
+                        // Also save to localStorage so immediate edits work
+                        localStorage.setItem('showcase-videos', JSON.stringify(data))
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load videos-config.json:', error)
+            } finally {
+                isLoaded.value = true
+            }
         }
     }
 
@@ -22,7 +42,7 @@ export const useVideoStore = defineStore('videos', () => {
         const newVideo = {
             id: Date.now().toString(),
             name: video.name,
-            url: video.url, // Path like /uploaded-video/filename.mp4
+            url: video.url,
             thumbnail: video.thumbnail || null,
             createdAt: new Date().toISOString(),
             order: videos.value.length
@@ -72,6 +92,7 @@ export const useVideoStore = defineStore('videos', () => {
 
     return {
         videos,
+        isLoaded,
         sortedVideos,
         videoCount,
         addVideo,

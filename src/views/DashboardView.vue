@@ -28,12 +28,20 @@
           <span class="stat-label">Total Videos</span>
         </div>
       </div>
-      <button v-if="videos.length > 0" class="btn btn-secondary clear-btn" @click="showClearConfirm = true">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 6H21M19 6V20C19 21 18 22 17 22H7C6 22 5 21 5 20V6M8 6V4C8 3 9 2 10 2H14C15 2 16 3 16 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        Clear All
-      </button>
+      <div class="stats-actions">
+        <button v-if="videos.length > 0" class="btn btn-secondary action-btn-small" @click="downloadConfig" title="Download configuration to make videos visible to everyone">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 15V3M12 15L8 11M12 15L16 11M2 17L2.621 19.484C2.8465 20.386 3.655 21 4.586 21H19.414C20.345 21 21.1535 20.386 21.379 19.484L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Download Config
+        </button>
+        <button v-if="videos.length > 0" class="btn btn-secondary clear-btn danger-hover" @click="showClearConfirm = true">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 6H21M19 6V20C19 21 18 22 17 22H7C6 22 5 21 5 20V6M8 6V4C8 3 9 2 10 2H14C15 2 16 3 16 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Clear All
+        </button>
+      </div>
     </div>
 
     
@@ -190,6 +198,19 @@ const clearAllVideos = () => {
   showClearConfirm.value = false
 }
 
+const downloadConfig = () => {
+  const data = JSON.stringify(videoStore.videos, null, 2)
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'videos-config.json'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 const openAddModal = () => {
   editingVideo.value = null
   isModalOpen.value = true
@@ -285,27 +306,54 @@ const formatDate = (dateString) => {
 /* Stats Bar */
 .stats-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .stat-card {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.5rem;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
 }
 
-.clear-btn {
-  margin-left: auto;
+.stats-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
 }
 
-.clear-btn svg {
+.action-btn-small {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.action-btn-small svg {
   width: 18px;
   height: 18px;
+}
+
+.clear-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.clear-btn.danger-hover:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
 }
 
 .confirm-icon.warning {
