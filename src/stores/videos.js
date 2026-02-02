@@ -7,29 +7,33 @@ export const useVideoStore = defineStore('videos', () => {
 
     // Load videos from localStorage or JSON file
     const loadVideos = async () => {
-        const saved = localStorage.getItem('showcase-videos')
-
-        if (saved && JSON.parse(saved).length > 0) {
-            videos.value = JSON.parse(saved)
-            isLoaded.value = true
-        } else {
-            // Try to load from public/videos-config.json
-            try {
-                const response = await fetch('/videos-config.json')
-                if (response.ok) {
-                    const data = await response.json()
-                    if (Array.isArray(data) && data.length > 0) {
-                        videos.value = data
-                        // Also save to localStorage so immediate edits work
-                        localStorage.setItem('showcase-videos', JSON.stringify(data))
-                    }
+        // Always try to load public config first for consistency
+        try {
+            const response = await fetch('/videos-config.json')
+            if (response.ok) {
+                const data = await response.json()
+                if (Array.isArray(data) && data.length > 0) {
+                    videos.value = data
+                    isLoaded.value = true
+                    // Sync to localStorage
+                    localStorage.setItem('showcase-videos', JSON.stringify(data))
+                    return
                 }
-            } catch (error) {
-                console.error('Failed to load videos-config.json:', error)
-            } finally {
-                isLoaded.value = true
+            }
+        } catch (error) {
+            console.warn('Public config not found, falling back to local storage')
+        }
+
+        // Fallback to localStorage if public config failed or was empty
+        const saved = localStorage.getItem('showcase-videos')
+        if (saved) {
+            try {
+                videos.value = JSON.parse(saved)
+            } catch (e) {
+                console.error('Failed to parse local storage videos')
             }
         }
+        isLoaded.value = true
     }
 
     // Save videos to localStorage
