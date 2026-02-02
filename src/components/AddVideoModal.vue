@@ -159,13 +159,10 @@ const isValid = computed(() => {
 // Reset form when modal opens
 watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
-    // Check API connection
-    try {
-      const resp = await fetch('/api/upload-test')
-      apiConnectionOk.value = resp.ok
-    } catch (e) {
-      apiConnectionOk.value = false
-    }
+    // Check API connection silently
+    fetch('/api/upload-test')
+      .then(resp => apiConnectionOk.value = resp.ok)
+      .catch(() => apiConnectionOk.value = false)
 
     if (props.video) {
       const videoFilename = props.video.url ? props.video.url.replace('/uploaded-video/', '') : ''

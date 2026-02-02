@@ -5,83 +5,79 @@ import formidable from 'formidable'
 import fs from 'node:fs'
 import path from 'node:path'
 
+// Custom middleware function
+const uploadMiddleware = (req, res, next) => {
+  const url = new URL(req.url, `http://${req.headers.host}`)
+  const pathname = url.pathname
+
+  // Log everything for debug
+  if (req.url.includes('/api/')) {
+    console.log(`[MIDDLEWARE HIT] ${req.method} ${req.url}`)
+  }
+
+  // Health check
+  if (pathname === '/api/upload-test') {
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify({ status: 'ok', time: Date.now() }))
+    return
+  }
+
+  // Upload handler
+  if (pathname === '/api/upload' && req.method === 'POST') {
+    console.log('STARTING UPLOAD...')
+    const uploadDir = path.resolve(fileURLToPath(new URL('./public/uploaded-video', import.meta.url)))
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+
+    const form = formidable({
+      uploadDir,
+      keepExtensions: true,
+      maxFileSize: 200 * 1024 * 1024,
+      filename: (name, ext, part, form) => {
+        return part.originalFilename || `file-${Date.now()}${ext}`
+      }
+    })
+
+    form.parse(req, (err, fields, files) => {
+      if (err) {
+        console.error('UPLOAD ERROR:', err)
+        res.statusCode = 500
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: err.message }))
+        return
+      }
+
+      const uploadedFiles = {}
+      for (const [key, value] of Object.entries(files)) {
+        const fileArr = Array.isArray(value) ? value : [value]
+        uploadedFiles[key] = fileArr.map(f => ({
+          originalFilename: f.originalFilename,
+          newFilename: f.newFilename,
+          mimetype: f.mimetype,
+          size: f.size
+        }))
+      }
+
+      console.log('UPLOAD COMPLETED')
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({ message: 'Success', files: uploadedFiles }))
+    })
+  } else {
+    next()
+  }
+}
+
 export default defineConfig({
   plugins: [
     vue(),
     {
-      name: 'file-upload-middleware',
+      name: 'api-middleware',
       configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          const url = new URL(req.url, `http://${req.headers.host}`)
-          const pathname = url.pathname
-
-          // Log any API request for debugging
-          if (pathname.startsWith('/api')) {
-            console.log(`[API DEBUG] ${req.method} ${pathname}`)
-          }
-
-          // Health check
-          if (pathname === '/api/upload-test') {
-            res.setHeader('Content-Type', 'application/json')
-            res.end(JSON.stringify({ status: 'ok', serverTime: new Date().toISOString() }))
-            return
-          }
-
-          // Check if it's the upload path
-          if (pathname === '/api/upload' && req.method === 'POST') {
-            console.log('UPLOAD: Processing POST request...')
-
-            const uploadDir = path.resolve(fileURLToPath(new URL('./public/uploaded-video', import.meta.url)))
-
-            // Ensure directory exists
-            if (!fs.existsSync(uploadDir)) {
-              console.log('UPLOAD: Creating directory:', uploadDir)
-              fs.mkdirSync(uploadDir, { recursive: true })
-            }
-
-            const form = formidable({
-              uploadDir,
-              keepExtensions: true,
-              maxFileSize: 100 * 1024 * 1024, // 100MB
-              filename: (name, ext, part, form) => {
-                const originalName = part.originalFilename || `file-${Date.now()}${ext}`
-                console.log('UPLOAD: Saving file as:', originalName)
-                return originalName
-              }
-            })
-
-            form.parse(req, (err, fields, files) => {
-              if (err) {
-                console.error('UPLOAD ERROR:', err)
-                res.statusCode = 500
-                res.setHeader('Content-Type', 'application/json')
-                res.end(JSON.stringify({ error: err.message }))
-                return
-              }
-
-              console.log('UPLOAD SUCCESS: Received files:', Object.keys(files))
-
-              const uploadedFiles = {}
-              for (const [key, value] of Object.entries(files)) {
-                const fileArr = Array.isArray(value) ? value : [value]
-                uploadedFiles[key] = fileArr.map(f => ({
-                  originalFilename: f.originalFilename,
-                  newFilename: f.newFilename,
-                  mimetype: f.mimetype,
-                  size: f.size
-                }))
-              }
-
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify({
-                message: 'Upload successful',
-                files: uploadedFiles
-              }))
-            })
-          } else {
-            next()
-          }
-        })
+        // Post-middleware to ensure we catch it if nothing else does,
+        // but typically better as pre-middleware.
+        server.middlewares.use(uploadMiddleware)
       }
     }
   ],
@@ -90,7 +86,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
-  build: {
-    outDir: 'dist'
+  server: {
+    // Force handle API routes
+    proxy: {
+    }
   }
 })
