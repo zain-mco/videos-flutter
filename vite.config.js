@@ -12,12 +12,18 @@ export default defineConfig({
       name: 'file-upload-middleware',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
+          // Health check
+          if (req.url === '/api/upload-test') {
+            res.end(JSON.stringify({ status: 'ok' }))
+            return
+          }
+
           // Check if it's the upload path
           if (req.url.startsWith('/api/upload') && req.method === 'POST') {
-            console.log('Upload request received:', req.url)
+            console.log('UPLOAD: Request received', req.url)
 
             const uploadDir = path.resolve(fileURLToPath(new URL('./public/uploaded-video', import.meta.url)))
-            console.log('Target upload directory:', uploadDir)
+            console.log('UPLOAD: Target dir', uploadDir)
 
             // Ensure directory exists
             if (!fs.existsSync(uploadDir)) {

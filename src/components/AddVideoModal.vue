@@ -231,8 +231,15 @@ const handleSubmit = async () => {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to upload files to local storage')
+        const responseText = await response.text()
+        let errorMessage = `Upload failed (Status: ${response.status})`
+        try {
+          const errorData = JSON.parse(responseText)
+          errorMessage = errorData.error || errorMessage
+        } catch (e) {
+          errorMessage += ': ' + responseText.substring(0, 100)
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
