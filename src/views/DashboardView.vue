@@ -28,7 +28,14 @@
           <span class="stat-label">Total Videos</span>
         </div>
       </div>
+      <button v-if="videos.length > 0" class="btn btn-secondary clear-btn" @click="showClearConfirm = true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 6H21M19 6V20C19 21 18 22 17 22H7C6 22 5 21 5 20V6M8 6V4C8 3 9 2 10 2H14C15 2 16 3 16 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Clear All
+      </button>
     </div>
+
     
     <!-- Video Grid -->
     <div class="video-grid" v-if="videos.length > 0">
@@ -128,6 +135,29 @@
         </div>
       </Transition>
     </Teleport>
+    
+    <!-- Clear All Confirmation -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showClearConfirm" class="modal-overlay" @click.self="showClearConfirm = false">
+          <div class="confirm-dialog">
+            <div class="confirm-icon warning">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <h3 class="confirm-title">Clear All Videos?</h3>
+            <p class="confirm-text">
+              This will remove all {{ videos.length }} videos from the list. This is useful to clear old data that's no longer working.
+            </p>
+            <div class="confirm-actions">
+              <button class="btn btn-secondary" @click="showClearConfirm = false">Cancel</button>
+              <button class="btn btn-danger" @click="clearAllVideos">Clear All</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -150,6 +180,15 @@ const playingVideo = ref(null)
 
 // Delete confirmation
 const deletingVideo = ref(null)
+
+// Clear all confirmation
+const showClearConfirm = ref(false)
+
+const clearAllVideos = () => {
+  localStorage.removeItem('showcase-videos')
+  videoStore.videos.splice(0, videoStore.videos.length)
+  showClearConfirm.value = false
+}
 
 const openAddModal = () => {
   editingVideo.value = null
@@ -258,6 +297,20 @@ const formatDate = (dateString) => {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
+}
+
+.clear-btn {
+  margin-left: auto;
+}
+
+.clear-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.confirm-icon.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
 }
 
 .stat-icon {
