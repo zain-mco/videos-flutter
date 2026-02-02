@@ -5,6 +5,12 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="modal-title">{{ isEdit ? 'Edit Video' : 'Add New Video' }}</h3>
+            <div v-if="!apiConnectionOk" class="api-warning">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 9V11M12 15H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0378 2.66667 10.268 4L3.33975 16C2.56995 17.3333 3.53224 19 5.07183 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>Server Sync Offline</span>
+            </div>
             <button class="close-btn" @click="close">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -132,6 +138,7 @@ const emit = defineEmits(['close', 'submit'])
 const error = ref('')
 const isUploading = ref(false)
 const uploadProgress = ref(0)
+const apiConnectionOk = ref(true)
 
 const videoFile = ref(null)
 const thumbFile = ref(null)
@@ -150,8 +157,16 @@ const isValid = computed(() => {
 })
 
 // Reset form when modal opens
-watch(() => props.isOpen, (isOpen) => {
+watch(() => props.isOpen, async (isOpen) => {
   if (isOpen) {
+    // Check API connection
+    try {
+      const resp = await fetch('/api/upload-test')
+      apiConnectionOk.value = resp.ok
+    } catch (e) {
+      apiConnectionOk.value = false
+    }
+
     if (props.video) {
       const videoFilename = props.video.url ? props.video.url.replace('/uploaded-video/', '') : ''
       const thumbFilename = props.video.thumbnail ? props.video.thumbnail.replace('/uploaded-video/', '') : ''
@@ -313,6 +328,24 @@ const close = () => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.api-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  color: #f59e0b;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.api-warning svg {
+  width: 14px;
+  height: 14px;
 }
 
 .close-btn {
