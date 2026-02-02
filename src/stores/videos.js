@@ -22,7 +22,7 @@ export const useVideoStore = defineStore('videos', () => {
         const newVideo = {
             id: Date.now().toString(),
             name: video.name,
-            url: video.url,
+            url: video.url, // Path like /uploaded-video/filename.mp4
             thumbnail: video.thumbnail || null,
             createdAt: new Date().toISOString(),
             order: videos.value.length
@@ -32,7 +32,7 @@ export const useVideoStore = defineStore('videos', () => {
         return newVideo
     }
 
-    // Update video name
+    // Update video
     const updateVideo = (id, updates) => {
         const index = videos.value.findIndex(v => v.id === id)
         if (index !== -1) {
@@ -45,14 +45,6 @@ export const useVideoStore = defineStore('videos', () => {
     const deleteVideo = (id) => {
         const index = videos.value.findIndex(v => v.id === id)
         if (index !== -1) {
-            // Revoke the blob URL to free memory
-            const video = videos.value[index]
-            if (video.url && video.url.startsWith('blob:')) {
-                URL.revokeObjectURL(video.url)
-            }
-            if (video.thumbnail && video.thumbnail.startsWith('blob:')) {
-                URL.revokeObjectURL(video.thumbnail)
-            }
             videos.value.splice(index, 1)
             saveVideos()
         }

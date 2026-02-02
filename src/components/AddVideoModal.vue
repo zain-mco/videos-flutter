@@ -25,54 +25,39 @@
               />
             </div>
             
-            <!-- Video File Upload -->
-            <div class="form-group" v-if="!isEdit">
-              <label class="form-label">Video File</label>
-              <div 
-                class="upload-area"
-                :class="{ 'has-file': formData.videoFile, 'is-dragging': isDragging }"
-                @dragover.prevent="isDragging = true"
-                @dragleave="isDragging = false"
-                @drop.prevent="handleDrop"
-                @click="triggerFileInput"
-              >
+            <!-- Video Filename -->
+            <div class="form-group">
+              <label class="form-label">Video Filename</label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">/uploaded-video/</span>
                 <input 
-                  ref="fileInput"
-                  type="file" 
-                  accept="video/*"
-                  @change="handleFileChange"
-                  hidden
+                  v-model="formData.filename"
+                  type="text" 
+                  class="input filename-input"
+                  placeholder="video.mp4"
+                  required
                 />
-                
-                <div v-if="formData.videoFile" class="file-preview">
-                  <div class="file-icon">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9.5 8.5L15.5 12L9.5 15.5V8.5Z" fill="currentColor"/>
-                      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                  </div>
-                  <div class="file-info">
-                    <span class="file-name">{{ formData.videoFile.name }}</span>
-                    <span class="file-size">{{ formatFileSize(formData.videoFile.size) }}</span>
-                  </div>
-                  <button type="button" class="remove-file" @click.stop="removeFile">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-                
-                <div v-else class="upload-placeholder">
-                  <div class="upload-icon">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 15V3M12 3L7 8M12 3L17 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                      <path d="M3 15V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                  </div>
-                  <p class="upload-text">Drop video here or <span>browse</span></p>
-                  <p class="upload-hint">MP4, WebM, MOV up to 100MB</p>
-                </div>
               </div>
+              <p class="form-hint">
+                Place your video file in the <code>public/uploaded-video/</code> folder and enter the filename here
+              </p>
+            </div>
+            
+            <!-- Thumbnail (Optional) -->
+            <div class="form-group">
+              <label class="form-label">Thumbnail Filename <span class="optional">(optional)</span></label>
+              <div class="input-with-prefix">
+                <span class="input-prefix">/uploaded-video/</span>
+                <input 
+                  v-model="formData.thumbnailFilename"
+                  type="text" 
+                  class="input filename-input"
+                  placeholder="thumbnail.jpg"
+                />
+              </div>
+              <p class="form-hint">
+                Optional: Add a thumbnail image (JPG/PNG) for the video
+              </p>
             </div>
             
             <!-- Error Message -->
@@ -83,8 +68,7 @@
             <!-- Actions -->
             <div class="modal-actions">
               <button type="button" class="btn btn-secondary" @click="close">Cancel</button>
-              <button type="submit" class="btn btn-primary" :disabled="!isValid || isLoading">
-                <span v-if="isLoading" class="loading-spinner"></span>
+              <button type="submit" class="btn btn-primary" :disabled="!isValid">
                 {{ isEdit ? 'Save Changes' : 'Add Video' }}
               </button>
             </div>
@@ -111,167 +95,58 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submit'])
 
-const fileInput = ref(null)
-const isDragging = ref(false)
-const isLoading = ref(false)
 const error = ref('')
 
 const formData = ref({
   name: '',
-  videoFile: null
+  filename: '',
+  thumbnailFilename: ''
 })
 
 const isEdit = computed(() => !!props.video)
 
 const isValid = computed(() => {
-  if (isEdit.value) {
-    return formData.value.name.trim() !== ''
-  }
-  return formData.value.name.trim() !== '' && formData.value.videoFile !== null
+  return formData.value.name.trim() !== '' && formData.value.filename.trim() !== ''
 })
 
 // Reset form when modal opens
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
     if (props.video) {
+      // Extract filename from URL for editing
+      const videoFilename = props.video.url ? props.video.url.replace('/uploaded-video/', '') : ''
+      const thumbFilename = props.video.thumbnail ? props.video.thumbnail.replace('/uploaded-video/', '') : ''
+      
       formData.value = {
         name: props.video.name,
-        videoFile: null
+        filename: videoFilename,
+        thumbnailFilename: thumbFilename
       }
     } else {
       formData.value = {
         name: '',
-        videoFile: null
+        filename: '',
+        thumbnailFilename: ''
       }
     }
     error.value = ''
   }
 })
 
-const triggerFileInput = () => {
-  fileInput.value?.click()
-}
-
-const handleFileChange = (event) => {
-  const file = event.target.files?.[0]
-  if (file) {
-    validateAndSetFile(file)
-  }
-}
-
-const handleDrop = (event) => {
-  isDragging.value = false
-  const file = event.dataTransfer.files?.[0]
-  if (file) {
-    validateAndSetFile(file)
-  }
-}
-
-const validateAndSetFile = (file) => {
-  error.value = ''
-  
-  // Check file type
-  if (!file.type.startsWith('video/')) {
-    error.value = 'Please select a valid video file'
-    return
-  }
-  
-  // Check file size (100MB limit)
-  if (file.size > 100 * 1024 * 1024) {
-    error.value = 'File size must be less than 100MB'
-    return
-  }
-  
-  formData.value.videoFile = file
-  
-  // Auto-fill name from filename if empty
-  if (!formData.value.name) {
-    formData.value.name = file.name.replace(/\.[^/.]+$/, '')
-  }
-}
-
-const removeFile = () => {
-  formData.value.videoFile = null
-  if (fileInput.value) {
-    fileInput.value.value = ''
-  }
-}
-
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-const handleSubmit = async () => {
+const handleSubmit = () => {
   if (!isValid.value) return
   
-  isLoading.value = true
-  error.value = ''
+  const filename = formData.value.filename.trim()
+  const thumbnailFilename = formData.value.thumbnailFilename.trim()
   
-  try {
-    let videoUrl = props.video?.url || null
-    let thumbnailUrl = props.video?.thumbnail || null
-    
-    if (formData.value.videoFile) {
-      // Create blob URL for the video
-      videoUrl = URL.createObjectURL(formData.value.videoFile)
-      
-      // Generate thumbnail from video
-      thumbnailUrl = await generateThumbnail(formData.value.videoFile)
-    }
-    
-    emit('submit', {
-      id: props.video?.id,
-      name: formData.value.name.trim(),
-      url: videoUrl,
-      thumbnail: thumbnailUrl
-    })
-    
-    close()
-  } catch (err) {
-    error.value = 'Failed to process video. Please try again.'
-  } finally {
-    isLoading.value = false
-  }
-}
-
-const generateThumbnail = (file) => {
-  return new Promise((resolve) => {
-    const video = document.createElement('video')
-    video.preload = 'metadata'
-    video.muted = true
-    video.playsInline = true
-    
-    video.onloadeddata = () => {
-      video.currentTime = 1 // Capture at 1 second
-    }
-    
-    video.onseeked = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(URL.createObjectURL(blob))
-        } else {
-          resolve(null)
-        }
-        URL.revokeObjectURL(video.src)
-      }, 'image/jpeg', 0.8)
-    }
-    
-    video.onerror = () => {
-      resolve(null)
-    }
-    
-    video.src = URL.createObjectURL(file)
+  emit('submit', {
+    id: props.video?.id,
+    name: formData.value.name.trim(),
+    url: `/uploaded-video/${filename}`,
+    thumbnail: thumbnailFilename ? `/uploaded-video/${thumbnailFilename}` : null
   })
+  
+  close()
 }
 
 const close = () => {
@@ -300,7 +175,7 @@ const close = () => {
   border: 1px solid var(--glass-border);
   border-radius: 24px;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -361,130 +236,61 @@ const close = () => {
   color: var(--text-secondary);
 }
 
-.upload-area {
-  border: 2px dashed var(--glass-border);
-  border-radius: 16px;
-  padding: 2rem;
-  text-align: center;
-  cursor: pointer;
+.form-label .optional {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.input-with-prefix {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
-.upload-area:hover,
-.upload-area.is-dragging {
+.input-with-prefix:focus-within {
   border-color: var(--accent-primary);
-  background: rgba(139, 92, 246, 0.05);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
 }
 
-.upload-area.has-file {
-  border-style: solid;
-  padding: 1rem;
-}
-
-.upload-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.upload-icon {
-  width: 48px;
-  height: 48px;
+.input-prefix {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: rgba(139, 92, 246, 0.1);
-  border-radius: 12px;
-  color: var(--accent-primary);
-}
-
-.upload-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.upload-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.upload-text span {
-  color: var(--accent-primary);
-  font-weight: 500;
-}
-
-.upload-hint {
-  font-size: 0.75rem;
+  padding: 0 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
-}
-
-.file-preview {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.file-icon {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  border-radius: 12px;
-  color: white;
-  flex-shrink: 0;
-}
-
-.file-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.file-info {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.file-name {
-  display: block;
   font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-family: monospace;
+  border-right: 1px solid var(--glass-border);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.file-size {
+.filename-input {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.filename-input:focus {
+  box-shadow: none !important;
+}
+
+.form-hint {
   font-size: 0.75rem;
   color: var(--text-muted);
+  margin-top: 0.25rem;
 }
 
-.remove-file {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(239, 68, 68, 0.1);
-  border: none;
-  border-radius: 8px;
-  color: #ef4444;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
-}
-
-.remove-file:hover {
-  background: rgba(239, 68, 68, 0.2);
-}
-
-.remove-file svg {
-  width: 16px;
-  height: 16px;
+.form-hint code {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--accent-primary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
 }
 
 .error-message {
@@ -504,19 +310,6 @@ const close = () => {
 
 .modal-actions .btn {
   flex: 1;
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 /* Transitions */
