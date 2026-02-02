@@ -25,12 +25,3 @@ npm-debug.log*
 
 # Vercel
 .vercel
-
-# Uploaded videos (large files - keep README only)
-public/uploaded-video/*.mp4
-public/uploaded-video/*.webm
-public/uploaded-video/*.mov
-public/uploaded-video/*.jpg
-public/uploaded-video/*.jpeg
-public/uploaded-video/*.png
-!public/uploaded-video/README.md
