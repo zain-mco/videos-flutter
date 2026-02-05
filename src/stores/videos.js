@@ -98,6 +98,7 @@ export const useVideoStore = defineStore('videos', () => {
 
     // Computed
     const videoCount = computed(() => videos.value.length)
+    const sortedVideos = computed(() => [...videos.value].sort((a, b) => (a.order || 0) - (b.order || 0)))
 
     // Initial Load
     loadVideos()
@@ -106,6 +107,7 @@ export const useVideoStore = defineStore('videos', () => {
         videos,
         isLoaded,
         videoCount,
+        sortedVideos,
         addVideo,
         updateVideo,
         deleteVideo,
