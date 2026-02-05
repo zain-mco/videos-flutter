@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { db, storage } from '../firebase'
+import { db } from '../firebase'
 import {
     collection,
     addDoc,
@@ -11,12 +11,7 @@ import {
     query,
     orderBy
 } from 'firebase/firestore'
-import {
-    ref as storageRef,
-    uploadBytes,
-    getDownloadURL,
-    deleteObject
-} from 'firebase/storage'
+import { uploadToCloudinary } from '../cloudinary'
 
 export const useVideoStore = defineStore('videos', () => {
     const videos = ref([])
@@ -40,38 +35,32 @@ export const useVideoStore = defineStore('videos', () => {
         })
     }
 
-    // Upload file to Firebase Storage
-    const uploadFile = async (file, path) => {
-        const fileRef = storageRef(storage, path)
-        await uploadBytes(fileRef, file)
-        return await getDownloadURL(fileRef)
-    }
-
     // Add a new video
     const addVideo = async (videoData, videoFile, thumbFile) => {
         try {
-            let videoUrl = videoData.url
-            let thumbUrl = videoData.thumbnail
+            let videoUrl = videoData.url || ''
+            let thumbUrl = videoData.thumbnail || null
 
-            // Upload Video
+            // Upload Video to Cloudinary
             if (videoFile) {
-                const filename = `videos/${Date.now()}_${videoFile.name}`
-                videoUrl = await uploadFile(videoFile, filename)
+                console.log('Uploading video to Cloudinary...')
+                videoUrl = await uploadToCloudinary(videoFile)
+                console.log('Video uploaded:', videoUrl)
             }
 
-            // Upload Thumbnail
+            // Upload Thumbnail to Cloudinary
             if (thumbFile) {
-                const filename = `thumbnails/${Date.now()}_${thumbFile.name}`
-                thumbUrl = await uploadFile(thumbFile, filename)
+                console.log('Uploading thumbnail to Cloudinary...')
+                thumbUrl = await uploadToCloudinary(thumbFile)
+                console.log('Thumbnail uploaded:', thumbUrl)
             }
 
-            // Save to Firestore
+            // Save metadata to Firestore
             await addDoc(collection(db, 'videos'), {
                 name: videoData.name,
                 url: videoUrl,
-                thumbnail: thumbUrl || null,
+                thumbnail: thumbUrl,
                 createdAt: new Date().toISOString(),
-                // Simplified ordering for now
                 order: videos.value.length
             })
             return true
@@ -93,13 +82,9 @@ export const useVideoStore = defineStore('videos', () => {
     }
 
     // Delete video
-    const deleteVideo = async (id, videoData) => {
+    const deleteVideo = async (id) => {
         try {
-            // Delete from Firestore
             await deleteDoc(doc(db, 'videos', id))
-
-            // Attempt to delete files from storage if they exist and look like firebase URLs
-            // (Skipping complex check for now to avoid breaking legacy/external URLs)
         } catch (e) {
             console.error("Error deleting video:", e)
             throw e
