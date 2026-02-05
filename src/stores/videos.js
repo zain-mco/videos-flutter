@@ -70,7 +70,7 @@ export const useVideoStore = defineStore('videos', () => {
         }
     }
 
-    // Update video
+    // Update video first
     const updateVideo = async (id, updates) => {
         try {
             const videoRef = doc(db, 'videos', id)
