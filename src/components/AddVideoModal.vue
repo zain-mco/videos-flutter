@@ -5,12 +5,6 @@
         <div class="modal-content">
           <div class="modal-header">
             <h3 class="modal-title">{{ isEdit ? 'Edit Video' : 'Add New Video' }}</h3>
-            <div v-if="!apiConnectionOk" class="api-warning">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 9V11M12 15H12.01M5.07183 19H18.9282C20.4678 19 21.4301 17.3333 20.6603 16L13.7321 4C12.9623 2.66667 11.0378 2.66667 10.268 4L3.33975 16C2.56995 17.3333 3.53224 19 5.07183 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>Server Sync Offline</span>
-            </div>
             <button class="close-btn" @click="close">
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -57,10 +51,6 @@
                   <button v-else type="button" class="remove-file" @click.stop="videoFile = null">Remove</button>
                 </div>
               </div>
-              <div class="input-fallback" v-if="!videoFile">
-                <span>Or enter filename:</span>
-                <input v-model="formData.filename" placeholder="video.mp4" class="input input-sm" />
-              </div>
             </div>
             
             <!-- Thumbnail File -->
@@ -85,18 +75,14 @@
                   <button v-else type="button" class="remove-file" @click.stop="removeThumb">Remove</button>
                 </div>
               </div>
-              <div class="input-fallback" v-if="!thumbFile">
-                <span>Or enter filename:</span>
-                <input v-model="formData.thumbnailFilename" placeholder="thumb.jpg" class="input input-sm" />
-              </div>
             </div>
             
             <!-- Progress Bar -->
             <div v-if="isUploading" class="upload-progress">
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${uploadProgress}%` }"></div>
+                <div class="progress-fill" :style="{ width: '100%' }"></div>
               </div>
-              <span class="progress-text">Uploading... {{ uploadProgress }}%</span>
+              <span class="progress-text">Uploading to Cloud... Please wait</span>
             </div>
 
             <!-- Error Message -->
@@ -121,6 +107,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useVideoStore } from '../stores/videos'
 
 const props = defineProps({
   isOpen: {
@@ -133,12 +120,11 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits(['close'])
+const videoStore = useVideoStore()
 
 const error = ref('')
 const isUploading = ref(false)
-const uploadProgress = ref(0)
-const apiConnectionOk = ref(true)
 
 const videoFile = ref(null)
 const thumbFile = ref(null)
@@ -146,38 +132,26 @@ const thumbPreview = ref(null)
 
 const formData = ref({
   name: '',
-  filename: '',
-  thumbnailFilename: ''
 })
 
 const isEdit = computed(() => !!props.video)
 
+// Validation: Name is required. If adding new, video file is required.
 const isValid = computed(() => {
-  return formData.value.name.trim() !== '' && (formData.value.filename.trim() !== '' || videoFile.value)
+  if (isEdit.value) return formData.value.name.trim() !== ''
+  return formData.value.name.trim() !== '' && videoFile.value
 })
 
 // Reset form when modal opens
-watch(() => props.isOpen, async (isOpen) => {
+watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
-    // Check API connection silently
-    fetch('/api/upload-test')
-      .then(resp => apiConnectionOk.value = resp.ok)
-      .catch(() => apiConnectionOk.value = false)
-
     if (props.video) {
-      const videoFilename = props.video.url ? props.video.url.replace('/uploaded-video/', '') : ''
-      const thumbFilename = props.video.thumbnail ? props.video.thumbnail.replace('/uploaded-video/', '') : ''
-      
       formData.value = {
-        name: props.video.name,
-        filename: videoFilename,
-        thumbnailFilename: thumbFilename
+        name: props.video.name
       }
     } else {
       formData.value = {
-        name: '',
-        filename: '',
-        thumbnailFilename: ''
+        name: ''
       }
     }
     videoFile.value = null
@@ -185,7 +159,6 @@ watch(() => props.isOpen, async (isOpen) => {
     thumbPreview.value = null
     error.value = ''
     isUploading.value = false
-    uploadProgress.value = 0
   }
 })
 
@@ -193,7 +166,10 @@ const handleVideoChange = (e) => {
   const file = e.target.files[0]
   if (file) {
     videoFile.value = file
-    formData.value.filename = file.name
+    // Auto-fill name if empty
+    if (!formData.value.name) {
+      formData.value.name = file.name.replace(/\.[^/.]+$/, "")
+    }
   }
 }
 
@@ -201,7 +177,6 @@ const handleThumbChange = (e) => {
   const file = e.target.files[0]
   if (file) {
     thumbFile.value = file
-    formData.value.thumbnailFilename = file.name
     thumbPreview.value = URL.createObjectURL(file)
   }
 }
@@ -209,7 +184,6 @@ const handleThumbChange = (e) => {
 const removeThumb = () => {
   thumbFile.value = null
   thumbPreview.value = null
-  formData.value.thumbnailFilename = ''
 }
 
 const formatSize = (bytes) => {
@@ -225,59 +199,26 @@ const handleSubmit = async () => {
   
   isUploading.value = true
   error.value = ''
-  uploadProgress.value = 10
 
   try {
-    let finalVideoUrl = props.video?.url || `/uploaded-video/${formData.value.filename.trim()}`
-    let finalThumbUrl = props.video?.thumbnail || (formData.value.thumbnailFilename.trim() ? `/uploaded-video/${formData.value.thumbnailFilename.trim()}` : null)
-
-    // Handle real file uploads if present
-    if (videoFile.value || thumbFile.value) {
-      const formDataUpload = new FormData()
-      if (videoFile.value) formDataUpload.append('video', videoFile.value)
-      if (thumbFile.value) formDataUpload.append('thumbnail', thumbFile.value)
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formDataUpload
+    if (isEdit.value) {
+      // For now, simpler update logic only supports name change
+      // Adding full file replacement would require more UI work
+      await videoStore.updateVideo(props.video.id, {
+        name: formData.value.name
       })
-
-      if (!response.ok) {
-        const responseText = await response.text()
-        let errorMessage = `Upload failed (Status: ${response.status})`
-        try {
-          const errorData = JSON.parse(responseText)
-          errorMessage = errorData.error || errorMessage
-        } catch (e) {
-          errorMessage += ': ' + responseText.substring(0, 100)
-        }
-        throw new Error(errorMessage)
-      }
-
-      const result = await response.json()
-      
-      if (videoFile.value && result.files.video) {
-        finalVideoUrl = `/uploaded-video/${result.files.video[0].originalFilename}`
-      }
-      if (thumbFile.value && result.files.thumbnail) {
-        finalThumbUrl = `/uploaded-video/${result.files.thumbnail[0].originalFilename}`
-      }
-      
-      uploadProgress.value = 100
-      await new Promise(resolve => setTimeout(resolve, 500))
+    } else {
+      await videoStore.addVideo(
+        { name: formData.value.name },
+        videoFile.value,
+        thumbFile.value
+      )
     }
-
-    emit('submit', {
-      id: props.video?.id,
-      name: formData.value.name.trim(),
-      url: finalVideoUrl,
-      thumbnail: finalThumbUrl
-    })
     
     close()
   } catch (e) {
     console.error(e)
-    error.value = e.message
+    error.value = "Failed to save video: " + e.message
   } finally {
     isUploading.value = false
   }
@@ -325,24 +266,6 @@ const close = () => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
-}
-
-.api-warning {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.75rem;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 8px;
-  color: #f59e0b;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.api-warning svg {
-  width: 14px;
-  height: 14px;
 }
 
 .close-btn {
@@ -499,6 +422,13 @@ const close = () => {
   height: 100%;
   background: var(--accent-gradient);
   transition: width 0.3s ease;
+  animation: progressPulse 1.5s infinite;
+}
+
+@keyframes progressPulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 
 .progress-text {

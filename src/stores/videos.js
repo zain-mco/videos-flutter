@@ -1,85 +1,109 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { db, storage } from '../firebase'
+import {
+    collection,
+    addDoc,
+    updateDoc,
+    deleteDoc,
+    doc,
+    onSnapshot,
+    query,
+    orderBy
+} from 'firebase/firestore'
+import {
+    ref as storageRef,
+    uploadBytes,
+    getDownloadURL,
+    deleteObject
+} from 'firebase/storage'
 
 export const useVideoStore = defineStore('videos', () => {
     const videos = ref([])
     const isLoaded = ref(false)
+    const error = ref(null)
 
-    // Load videos from localStorage or JSON file
-    const loadVideos = async () => {
-        // Always try to load public config first for consistency
-        try {
-            const response = await fetch('/videos-config.json')
-            if (response.ok) {
-                const data = await response.json()
-                if (Array.isArray(data) && data.length > 0) {
-                    videos.value = data
-                    isLoaded.value = true
-                    // Sync to localStorage
-                    localStorage.setItem('showcase-videos', JSON.stringify(data))
-                    return
-                }
-            }
-        } catch (error) {
-            console.warn('Public config not found, falling back to local storage')
-        }
+    // Real-time listener for videos
+    const loadVideos = () => {
+        const q = query(collection(db, 'videos'), orderBy('createdAt', 'desc'))
 
-        // Fallback to localStorage if public config failed or was empty
-        const saved = localStorage.getItem('showcase-videos')
-        if (saved) {
-            try {
-                videos.value = JSON.parse(saved)
-            } catch (e) {
-                console.error('Failed to parse local storage videos')
-            }
-        }
-        isLoaded.value = true
+        onSnapshot(q, (snapshot) => {
+            videos.value = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }))
+            isLoaded.value = true
+        }, (err) => {
+            console.error("Error fetching videos:", err)
+            error.value = err.message
+            isLoaded.value = true
+        })
     }
 
-    // Save videos to localStorage
-    const saveVideos = () => {
-        localStorage.setItem('showcase-videos', JSON.stringify(videos.value))
+    // Upload file to Firebase Storage
+    const uploadFile = async (file, path) => {
+        const fileRef = storageRef(storage, path)
+        await uploadBytes(fileRef, file)
+        return await getDownloadURL(fileRef)
     }
 
     // Add a new video
-    const addVideo = (video) => {
-        const newVideo = {
-            id: Date.now().toString(),
-            name: video.name,
-            url: video.url,
-            thumbnail: video.thumbnail || null,
-            createdAt: new Date().toISOString(),
-            order: videos.value.length
+    const addVideo = async (videoData, videoFile, thumbFile) => {
+        try {
+            let videoUrl = videoData.url
+            let thumbUrl = videoData.thumbnail
+
+            // Upload Video
+            if (videoFile) {
+                const filename = `videos/${Date.now()}_${videoFile.name}`
+                videoUrl = await uploadFile(videoFile, filename)
+            }
+
+            // Upload Thumbnail
+            if (thumbFile) {
+                const filename = `thumbnails/${Date.now()}_${thumbFile.name}`
+                thumbUrl = await uploadFile(thumbFile, filename)
+            }
+
+            // Save to Firestore
+            await addDoc(collection(db, 'videos'), {
+                name: videoData.name,
+                url: videoUrl,
+                thumbnail: thumbUrl || null,
+                createdAt: new Date().toISOString(),
+                // Simplified ordering for now
+                order: videos.value.length
+            })
+            return true
+        } catch (e) {
+            console.error("Error adding video:", e)
+            throw e
         }
-        videos.value.push(newVideo)
-        saveVideos()
-        return newVideo
     }
 
     // Update video
-    const updateVideo = (id, updates) => {
-        const index = videos.value.findIndex(v => v.id === id)
-        if (index !== -1) {
-            videos.value[index] = { ...videos.value[index], ...updates }
-            saveVideos()
+    const updateVideo = async (id, updates) => {
+        try {
+            const videoRef = doc(db, 'videos', id)
+            await updateDoc(videoRef, updates)
+        } catch (e) {
+            console.error("Error updating video:", e)
+            throw e
         }
     }
 
     // Delete video
-    const deleteVideo = (id) => {
-        const index = videos.value.findIndex(v => v.id === id)
-        if (index !== -1) {
-            videos.value.splice(index, 1)
-            saveVideos()
-        }
-    }
+    const deleteVideo = async (id, videoData) => {
+        try {
+            // Delete from Firestore
+            await deleteDoc(doc(db, 'videos', id))
 
-    // Reorder videos
-    const reorderVideos = (fromIndex, toIndex) => {
-        const item = videos.value.splice(fromIndex, 1)[0]
-        videos.value.splice(toIndex, 0, item)
-        videos.value.forEach((v, i) => v.order = i)
-        saveVideos()
+            // Attempt to delete files from storage if they exist and look like firebase URLs
+            // (Skipping complex check for now to avoid breaking legacy/external URLs)
+        } catch (e) {
+            console.error("Error deleting video:", e)
+            throw e
+        }
     }
 
     // Get video by ID
@@ -89,21 +113,17 @@ export const useVideoStore = defineStore('videos', () => {
 
     // Computed
     const videoCount = computed(() => videos.value.length)
-    const sortedVideos = computed(() => [...videos.value].sort((a, b) => a.order - b.order))
 
-    // Initialize
+    // Initial Load
     loadVideos()
 
     return {
         videos,
         isLoaded,
-        sortedVideos,
         videoCount,
         addVideo,
         updateVideo,
         deleteVideo,
-        reorderVideos,
-        getVideoById,
-        loadVideos
+        getVideoById
     }
 })
