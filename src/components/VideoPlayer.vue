@@ -11,35 +11,22 @@
           </button>
           
           <!-- Video Title -->
-          <div class="player-header">
-            <h2 class="video-title">{{ video?.name }}</h2>
-          </div>
+          <h2 class="video-title">{{ video?.name }}</h2>
           
-          <!-- Video Player -->
-          <div class="player-wrapper">
-            <!-- Loading State -->
-            <div v-if="isLoading" class="loading-overlay">
-              <div class="spinner"></div>
-              <p>Loading video...</p>
+          <!-- Phone Frame -->
+          <div class="phone-mockup">
+            <div class="phone-speaker"></div>
+            <div class="phone-screen">
+              <video 
+                ref="videoElement"
+                :src="video?.url"
+                class="video"
+                controls
+                autoplay
+                playsinline
+              />
             </div>
-            
-            <!-- Error State -->
-            <div v-if="hasError" class="error-overlay">
-              <p>Failed to load video</p>
-              <button class="retry-btn" @click="retryLoad">Retry</button>
-            </div>
-            
-            <video 
-              ref="videoElement"
-              :src="video?.url"
-              class="main-video"
-              controls
-              autoplay
-              playsinline
-              @loadstart="isLoading = true"
-              @canplay="isLoading = false"
-              @error="handleError"
-            />
+            <div class="phone-home-bar"></div>
           </div>
         </div>
       </div>
@@ -51,55 +38,24 @@
 import { ref, watch } from 'vue'
 
 const props = defineProps({
-  video: {
-    type: Object,
-    default: null
-  },
-  isOpen: {
-    type: Boolean,
-    default: false
-  }
+  video: { type: Object, default: null },
+  isOpen: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['close'])
-
 const videoElement = ref(null)
-const isLoading = ref(false)
-const hasError = ref(false)
 
 const close = () => {
-  if (videoElement.value) {
-    videoElement.value.pause()
-  }
+  if (videoElement.value) videoElement.value.pause()
   emit('close')
 }
 
-const handleError = (e) => {
-  console.error('Video playback error:', e)
-  isLoading.value = false
-  hasError.value = true
-}
-
-const retryLoad = () => {
-  hasError.value = false
-  isLoading.value = true
-  if (videoElement.value) {
-    videoElement.value.load()
-  }
-}
-
 watch(() => props.isOpen, (isOpen) => {
+  document.body.style.overflow = isOpen ? 'hidden' : ''
   if (isOpen) {
-    isLoading.value = true
-    hasError.value = false
-    document.body.style.overflow = 'hidden'
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') close()
-    }
+    const handleEscape = (e) => { if (e.key === 'Escape') close() }
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
-  } else {
-    document.body.style.overflow = ''
   }
 })
 </script>
@@ -107,34 +63,26 @@ watch(() => props.isOpen, (isOpen) => {
 <style scoped>
 .video-player-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  padding: 2rem;
+  padding: 20px;
 }
 
 .player-container {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  width: 100%;
-  max-width: 900px;
-  max-height: 90vh;
+  gap: 20px;
 }
 
 .close-btn {
-  position: absolute;
-  top: -50px;
-  right: 0;
+  position: fixed;
+  top: 20px;
+  right: 20px;
   width: 44px;
   height: 44px;
   display: flex;
@@ -145,105 +93,86 @@ watch(() => props.isOpen, (isOpen) => {
   border-radius: 50%;
   color: white;
   cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 
 .close-btn svg {
-  width: 24px;
-  height: 24px;
-}
-
-.player-header {
-  text-align: center;
+  width: 22px;
+  height: 22px;
 }
 
 .video-title {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: white;
+  text-align: center;
 }
 
-.player-wrapper {
+/* Phone Mockup */
+.phone-mockup {
   position: relative;
+  width: 280px;
+  height: 580px;
+  background: #1a1a1a;
+  border-radius: 36px;
+  padding: 10px;
+  box-shadow: 
+    0 0 0 2px #333,
+    0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.phone-speaker {
+  width: 80px;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  margin: 8px auto 10px;
+}
+
+.phone-screen {
   width: 100%;
-  max-width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
+  height: calc(100% - 50px);
   background: #000;
+  border-radius: 26px;
+  overflow: hidden;
 }
 
-.main-video {
+.video {
   width: 100%;
-  max-height: 70vh;
-  display: block;
-  background: black;
+  height: 100%;
+  object-fit: contain;
 }
 
-/* Loading & Error Overlays */
-.loading-overlay,
-.error-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.8);
-  z-index: 5;
-  color: white;
-  gap: 1rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  border-top-color: var(--accent-primary, #8b5cf6);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.retry-btn {
-  padding: 0.5rem 1.5rem;
-  background: var(--accent-primary, #8b5cf6);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.retry-btn:hover {
-  opacity: 0.8;
+.phone-home-bar {
+  width: 100px;
+  height: 4px;
+  background: #444;
+  border-radius: 2px;
+  margin: 12px auto 0;
 }
 
 /* Transitions */
-.player-enter-active,
-.player-leave-active {
-  transition: all 0.3s ease;
+.player-enter-active, .player-leave-active {
+  transition: opacity 0.3s ease;
 }
-
-.player-enter-from,
-.player-leave-to {
+.player-enter-from, .player-leave-to {
   opacity: 0;
 }
 
-.player-enter-from .player-container,
-.player-leave-to .player-container {
-  transform: scale(0.95);
+/* Responsive */
+@media (max-height: 700px) {
+  .phone-mockup {
+    width: 220px;
+    height: 460px;
+  }
+}
+
+@media (max-height: 550px) {
+  .phone-mockup {
+    width: 180px;
+    height: 380px;
+  }
+  .video-title {
+    font-size: 1rem;
+  }
 }
 </style>
