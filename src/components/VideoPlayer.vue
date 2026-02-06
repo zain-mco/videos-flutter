@@ -19,6 +19,19 @@
           <div class="player-wrapper">
             <div class="phone-frame">
               <div class="phone-notch"></div>
+              
+              <!-- Loading State -->
+              <div v-if="isLoading" class="loading-overlay">
+                <div class="spinner"></div>
+                <p>Loading video...</p>
+              </div>
+              
+              <!-- Error State -->
+              <div v-if="hasError" class="error-overlay">
+                <p>Failed to load video</p>
+                <button class="retry-btn" @click="retryLoad">Retry</button>
+              </div>
+              
               <video 
                 ref="videoElement"
                 :src="video?.url"
@@ -26,6 +39,10 @@
                 controls
                 autoplay
                 playsinline
+                crossorigin="anonymous"
+                @loadstart="isLoading = true"
+                @canplay="isLoading = false"
+                @error="handleError"
               />
             </div>
           </div>
@@ -52,6 +69,8 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const videoElement = ref(null)
+const isLoading = ref(false)
+const hasError = ref(false)
 
 const close = () => {
   if (videoElement.value) {
@@ -60,9 +79,26 @@ const close = () => {
   emit('close')
 }
 
-// Handle escape key
+const handleError = (e) => {
+  console.error('Video playback error:', e)
+  isLoading.value = false
+  hasError.value = true
+}
+
+const retryLoad = () => {
+  hasError.value = false
+  isLoading.value = true
+  if (videoElement.value) {
+    videoElement.value.load()
+  }
+}
+
+// Handle escape key and reset state when modal opens/closes
 watch(() => props.isOpen, (isOpen) => {
   if (isOpen) {
+    // Reset states when opening
+    isLoading.value = true
+    hasError.value = false
     document.body.style.overflow = 'hidden'
     const handleEscape = (e) => {
       if (e.key === 'Escape') close()
@@ -221,5 +257,52 @@ watch(() => props.isOpen, (isOpen) => {
   .phone-frame {
     width: 200px;
   }
+}
+
+/* Loading & Error Overlays */
+.loading-overlay,
+.error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 28px;
+  z-index: 5;
+  color: white;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent-primary, #8b5cf6);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.retry-btn {
+  padding: 0.5rem 1.5rem;
+  background: var(--accent-primary, #8b5cf6);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.retry-btn:hover {
+  opacity: 0.8;
 }
 </style>
