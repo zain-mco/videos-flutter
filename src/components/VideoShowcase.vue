@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import VideoCard from './VideoCard.vue'
 
 const props = defineProps({
@@ -64,23 +64,45 @@ const props = defineProps({
 const emit = defineEmits(['play'])
 
 const activeIndex = ref(0)
+const cardWidth = ref(280)
+
+const updateCardWidth = () => {
+  if (window.innerWidth <= 480) {
+    cardWidth.value = 200
+  } else if (window.innerWidth <= 768) {
+    cardWidth.value = 240
+  } else {
+    cardWidth.value = 280
+  }
+}
+
+onMounted(() => {
+  updateCardWidth()
+  window.addEventListener('resize', updateCardWidth)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateCardWidth)
+})
 
 const getItemStyle = (index) => {
   const diff = index - activeIndex.value
   const absDistance = Math.abs(diff)
   
-  // Calculate position - items on left go negative, items on right go positive
-  const translateX = diff * 320 // Card width + gap
-  const translateZ = -absDistance * 150
-  const rotateY = diff * -25
-  const scale = Math.max(0.7, 1 - absDistance * 0.15)
-  const opacity = Math.max(0, 1 - absDistance * 0.4)
+  // Responsive spacing
+  const spacing = cardWidth.value * 1.15
+  const translateX = diff * spacing
+  const translateZ = -absDistance * 100
+  const rotateY = diff * -20
+  const scale = Math.max(0.75, 1 - absDistance * 0.12)
+  const opacity = Math.max(0, 1 - absDistance * 0.5)
   
   return {
     transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
     opacity: absDistance > 2 ? 0 : opacity,
     zIndex: 100 - absDistance,
-    pointerEvents: absDistance > 1 ? 'none' : 'auto'
+    pointerEvents: absDistance > 1 ? 'none' : 'auto',
+    width: `${cardWidth.value}px`
   }
 }
 
@@ -118,25 +140,24 @@ const goTo = (index) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3rem;
-  padding: 2rem;
-  min-height: calc(100vh - 80px);
+  gap: 2rem;
+  padding: 1rem;
+  min-height: calc(100vh - 200px);
 }
 
 .carousel-wrapper {
   position: relative;
   width: 100%;
-  height: 550px;
+  height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
   perspective: 1200px;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .carousel-track {
   position: relative;
-  width: 280px;
   height: 100%;
   display: flex;
   align-items: center;
@@ -146,7 +167,6 @@ const goTo = (index) => {
 
 .carousel-item {
   position: absolute;
-  width: 280px;
   transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-style: preserve-3d;
   cursor: pointer;
@@ -160,12 +180,12 @@ const goTo = (index) => {
 .carousel-nav {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .nav-btn {
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,7 +201,6 @@ const goTo = (index) => {
   background: rgba(139, 92, 246, 0.2);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
-  transform: scale(1.1);
 }
 
 .nav-btn:disabled {
@@ -190,8 +209,8 @@ const goTo = (index) => {
 }
 
 .nav-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .nav-dots {
@@ -224,11 +243,10 @@ const goTo = (index) => {
   display: flex;
   align-items: baseline;
   gap: 0.25rem;
-  font-family: 'Inter', monospace;
 }
 
 .carousel-counter .current {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   background: var(--accent-gradient);
   -webkit-background-clip: text;
@@ -237,28 +255,54 @@ const goTo = (index) => {
 }
 
 .carousel-counter .separator {
-  font-size: 1.25rem;
+  font-size: 1rem;
   color: var(--text-muted);
   margin: 0 0.25rem;
 }
 
 .carousel-counter .total {
-  font-size: 1rem;
+  font-size: 0.875rem;
   color: var(--text-muted);
 }
 
-/* Responsive */
+/* Mobile Responsive */
 @media (max-width: 768px) {
+  .showcase-container {
+    gap: 1.5rem;
+    padding: 0.5rem;
+  }
+  
   .carousel-wrapper {
-    height: 450px;
+    height: 420px;
   }
   
-  .carousel-track {
-    width: 220px;
+  .nav-btn {
+    width: 40px;
+    height: 40px;
   }
   
-  .carousel-item {
-    width: 220px;
+  .nav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .carousel-wrapper {
+    height: 380px;
+  }
+  
+  .carousel-nav {
+    gap: 0.75rem;
+  }
+  
+  .nav-btn {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .carousel-counter .current {
+    font-size: 1.25rem;
   }
 }
 </style>
